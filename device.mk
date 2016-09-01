@@ -40,10 +40,6 @@ PRODUCT_COPY_FILES += \
 PRODUCT_PACKAGES += \
     Snap
 
-# Doze
-PRODUCT_PACKAGES += \
-    SamsungDoze
-
 # GPS
 PRODUCT_PACKAGES += \
     gps.msm8960 \
