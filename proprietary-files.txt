@@ -18,6 +18,10 @@ bin/mm-qcamera-daemon
 cameradata/datapattern_420sp.yuv
 cameradata/datapattern_front_420sp.yuv
 lib/hw/camera.msm8960.so:lib/hw/camera.vendor.msm8960.so
+lib/libsecnativefeature.so
+lib/libmmmpod.so
+lib/libmmstereo.so
+lib/libmmcamera_faceproc.so
 lib/libmmcamera_frameproc.so
 lib/libmmcamera_statsproc30.so
 lib/libmmjpeg.so
@@ -37,6 +41,8 @@ lib/libchromatix_s5k6a3yx_vt_hd.so
 lib/libchromatix_s5k6a3yx_vt.so
 
 # Camera firmware
+cameradata/datapattern_420sp.yuv
+cameradata/datapattern_front_420sp.yuv
 cameradata/SlimISP_BH.bin
 cameradata/SlimISP_GC.bin
 cameradata/SlimISP_GD.bin
@@ -87,6 +93,40 @@ vendor/lib/libizat_core.so
 vendor/lib/liblbs_core.so
 vendor/lib/liblocationservice.so
 
+# GPU
+vendor/lib/egl/eglsubAndroid.so
+vendor/lib/egl/libEGL_adreno.so
+vendor/lib/egl/libGLESv1_CM_adreno.so
+vendor/lib/egl/libGLESv2_adreno.so
+vendor/lib/egl/libGLESv2S3D_adreno.so
+vendor/lib/egl/libq3dtools_adreno.so
+vendor/lib/libadreno_utils.so
+vendor/lib/libc2d2_z180.so
+vendor/lib/libC2D2.so
+vendor/lib/libCB.so
+vendor/lib/libgsl.so
+vendor/lib/libOpenCL.so
+vendor/lib/libOpenVG.so
+vendor/lib/libsc-a2xx.so
+vendor/lib/libuiblur.so
+
+# GPU firmware
+etc/firmware/a225p5_pm4.fw
+etc/firmware/a225_pfp.fw
+etc/firmware/a225_pm4.fw
+etc/firmware/leia_pfp_470.fw
+etc/firmware/leia_pm4_470.fw
+etc/firmware/a225p5_pm4.fw
+etc/firmware/vidc_1080p.fw
+
+# Media
+lib/libDivxDrm.so
+lib/libI420colorconvert.so
+lib/libmm-color-convertor.so
+lib/libmmosal.so
+lib/libSHIMDivxDrm.so
+lib/libwvm.so
+
 # Radio
 bin/ds_fmc_appd
 bin/efsks
@@ -123,6 +163,8 @@ lib/libakmd.so
 lib/libinvensense_hal.so
 lib/libmllite.so
 lib/libmlplatform.so
+lib/libmplmpu.so
+lib/libyamaha.so
 
 # Wi-Fi
 etc/wifi/bcmdhd_apsta.bin_b2
