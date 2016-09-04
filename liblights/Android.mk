@@ -13,18 +13,14 @@
 # limitations under the License.
 
 LOCAL_PATH:= $(call my-dir)
-# HAL module implementation stored in
+# HAL module implemenation stored in
 # hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.board.platform>.so
 include $(CLEAR_VARS)
 
-# Backlight notification for devices with no notification LED
-ifeq ($(BOARD_USE_BLN),true)
-LOCAL_CFLAGS += -DUSE_BLN
-endif
-
 LOCAL_SRC_FILES := lights.c
 
-LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+
+LOCAL_MODULE_RELATIVE_PATH := hw
 
 LOCAL_SHARED_LIBRARIES := liblog
 

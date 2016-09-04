@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2014 The CyanogenMod Project
+# Copyright (C) 2012 The Android Open-Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,85 +14,53 @@
 # limitations under the License.
 #
 
+# WARNING: Everything listed here will be built on ALL platforms,
+# including x86, the emulator, and the SDK.  Modules must be uniquely
+# named (liblights.tuna), and must build everywhere, or limit themselves
+# to only building on ARM if they include assembly. Individual makefiles
+# are responsible for having their own logic, for fine-grained control.
+
 LOCAL_PATH := $(call my-dir)
 
-ifneq ($(filter d2att d2bst d2cri d2csp d2mtr d2refreshspr d2spr d2tmo d2usc d2vzw,$(TARGET_DEVICE)),)
+ifneq ($(filter jactivelte jflteatt jfltespr jfltetmo jfltevzw jfltexx jfltecan jflteusc jfltecri jfltecsp jfltezm jftddxx,$(TARGET_DEVICE)),)
+
 include $(call all-subdir-makefiles,$(LOCAL_PATH))
 
-FIRMWARE_DSPS_IMAGES := \
-    dsps.b00 dsps.b01 dsps.b02 dsps.b03 dsps.b04 dsps.b05 dsps.mdt
+include $(CLEAR_VARS)
 
-FIRMWARE_DSPS_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_DSPS_IMAGES)))
-$(FIRMWARE_DSPS_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "DSPS Firmware link: $@"
+# Create /firmware-mdm links
+FIRMWARE_MDM_IMAGES := \
+    acdb.mbn \
+    apps.mbn \
+    dsp1.mbn dsp2.mbn dsp3.mbn \
+    efs1.mbn efs2.mbn efs3.mbn \
+    mdm_acdb.img \
+    rpm.mbn \
+    sbl1.mbn \
+    sbl2.mbn
+
+FIRMWARE_MDM_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_MDM_IMAGES)))
+$(FIRMWARE_MDM_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
+	@echo "Firmware link: $@"
 	@mkdir -p $(dir $@)
 	@rm -rf $@
 	$(hide) ln -sf /firmware-mdm/image/$(notdir $@) $@
 
-ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_DSPS_SYMLINKS)
+ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_MDM_SYMLINKS)
 
-FIRMWARE_MODEM_IMAGES := \
-    modem.b00 modem.b01 modem.b02 modem.b03 modem.b04 modem.b05 modem.b06 modem.b07 modem.b08 \
-    modem.b09 modem.b10 modem.mdt
 
-FIRMWARE_MODEM_IMAGES += \
-    modem_fw.b00 modem_fw.b01 modem_fw.b02 modem_fw.b03 modem_fw.b04 modem_fw.b05 modem_fw.b06 \
-    modem_fw.b07 modem_fw.b08 modem_fw.b09 modem_fw.b10 modem_fw.b11 modem_fw.b12 modem_fw.b13 \
-    modem_fw.b14 modem_fw.b15 modem_fw.b16 modem_fw.b17 modem_fw.b18 modem_fw.b21 modem_fw.b22 \
-    modem_fw.b23 modem_fw.b24 modem_fw.b25 modem_fw.b26 modem_fw.b27 modem_fw.b28 modem_fw.b29 \
-    modem_fw.b31 modem_fw.mdt
-
-FIRMWARE_MODEM_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_MODEM_IMAGES)))
-ifeq ($(filter d2bst d2refreshspr,$(TARGET_DEVICE)),)
-$(FIRMWARE_MODEM_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "Modem Firmware link: $@"
-	@mkdir -p $(dir $@)
-	@rm -rf $@
-	$(hide) ln -sf /firmware-mdm/image/$(notdir $(subst modem_fw,modem_f2,$@)) $@
-else
-$(FIRMWARE_MODEM_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "Modem Firmware link: $@"
-	@mkdir -p $(dir $@)
-	@rm -rf $@
-	$(hide) ln -sf /firmware-mdm/image/$(notdir $@) $@
-endif
-
-ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_MODEM_SYMLINKS)
-
-FIRMWARE_Q6_IMAGES := \
-    q6.b00 q6.b01 q6.b03 q6.b04 q6.b05 q6.b06 q6.mdt
-
-FIRMWARE_Q6_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_Q6_IMAGES)))
-$(FIRMWARE_Q6_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "Q6 Firmware link: $@"
-	@mkdir -p $(dir $@)
-	@rm -rf $@
-	$(hide) ln -sf /firmware-mdm/image/$(notdir $@) $@
-
-ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_Q6_SYMLINKS)
-
-FIRMWARE_TZ_IMAGES := \
+# Create /firmware links
+FIRMWARE_IMAGES := \
+    q6.b00 q6.b01 q6.b03 q6.b04 q6.b05 q6.b06 q6.mdt \
     tzapps.b00 tzapps.b01 tzapps.b02 tzapps.b03 tzapps.mdt
 
-FIRMWARE_TZ_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_TZ_IMAGES)))
-$(FIRMWARE_TZ_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "TZ Firmware link: $@"
+FIRMWARE_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_IMAGES)))
+$(FIRMWARE_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
+	@echo "Firmware link: $@"
 	@mkdir -p $(dir $@)
 	@rm -rf $@
-	$(hide) ln -sf /firmware-mdm/image/$(notdir $@) $@
+	$(hide) ln -sf /firmware/image/$(notdir $@) $@
 
-ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_TZ_SYMLINKS)
-
-FIRMWARE_VIDC_IMAGES := \
-    vidc.b00 vidc.b01 vidc.b02 vidc.b03 vidc.mdt
-
-FIRMWARE_VIDC_SYMLINKS := $(addprefix $(TARGET_OUT_ETC)/firmware/,$(notdir $(FIRMWARE_VIDC_IMAGES)))
-$(FIRMWARE_VIDC_SYMLINKS): $(LOCAL_INSTALLED_MODULE)
-	@echo "Vidc Firmware link: $@"
-	@mkdir -p $(dir $@)
-	@rm -rf $@
-	$(hide) ln -sf /firmware-mdm/image/$(notdir $@) $@
-
-ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_VIDC_SYMLINKS)
+ALL_DEFAULT_INSTALLED_MODULES += $(FIRMWARE_SYMLINKS)
 
 endif

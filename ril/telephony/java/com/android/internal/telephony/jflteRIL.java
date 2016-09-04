@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015 The CyanogenMod Project
+ * Copyright (C) 2012-2014 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,37 +21,59 @@ import static com.android.internal.telephony.RILConstants.*;
 import android.content.Context;
 import android.media.AudioManager;
 import android.os.AsyncResult;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Message;
 import android.os.Parcel;
-import android.os.SystemClock;
+import android.telephony.SmsMessage;
 import android.os.SystemProperties;
-import android.telephony.PhoneNumberUtils;
+import android.os.SystemClock;
+import android.provider.Settings;
+import android.text.TextUtils;
 import android.telephony.Rlog;
+
 import android.telephony.SignalStrength;
+
+import android.telephony.PhoneNumberUtils;
+import com.android.internal.telephony.RILConstants;
+import com.android.internal.telephony.gsm.SmsBroadcastConfigInfo;
 import com.android.internal.telephony.cdma.CdmaInformationRecords;
+import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaSignalInfoRec;
 import com.android.internal.telephony.cdma.SignalToneUtil;
-import com.android.internal.telephony.uicc.IccCardApplicationStatus;
-import com.android.internal.telephony.uicc.IccCardStatus;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import com.android.internal.telephony.uicc.IccCardApplicationStatus;
+import com.android.internal.telephony.uicc.IccCardStatus;
+
 /**
- * Qualcomm RIL for the Samsung d2 family.
+ * Qualcomm RIL for the Samsung family.
+ * Quad core Exynos4 with Qualcomm modem and later is supported
+ * Snapdragon S3 and later is supported
+ * This RIL is univerisal meaning it supports CDMA and GSM radio.
+ * Handles most GSM and CDMA cases.
  * {@hide}
  */
-public class d2lteRIL extends RIL implements CommandsInterface {
+public class jflteRIL extends RIL implements CommandsInterface {
 
     private AudioManager mAudioManager;
-    private boolean isGSM = false;
 
-    public d2lteRIL(Context context, int networkModes, int cdmaSubscription) {
+    private Object mSMSLock = new Object();
+    private boolean mIsSendingSMS = false;
+    protected boolean isGSM = false;
+    public static final long SEND_SMS_TIMEOUT_IN_MS = 30000;
+
+    private Message mPendingGetSimStatus;
+
+    public jflteRIL(Context context, int networkModes, int cdmaSubscription) {
         this(context, networkModes, cdmaSubscription, null);
         mAudioManager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
     }
 
-    public d2lteRIL(Context context, int preferredNetworkType,
+    public jflteRIL(Context context, int preferredNetworkType,
             int cdmaSubscription, Integer instanceId) {
         super(context, preferredNetworkType, cdmaSubscription, instanceId);
         mAudioManager = (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
@@ -128,6 +150,44 @@ public class d2lteRIL extends RIL implements CommandsInterface {
     }
 
     @Override
+    public void
+    sendCdmaSms(byte[] pdu, Message result) {
+        smsLock();
+        super.sendCdmaSms(pdu, result);
+    }
+
+    @Override
+    public void
+        sendSMS (String smscPDU, String pdu, Message result) {
+        smsLock();
+        super.sendSMS(smscPDU, pdu, result);
+    }
+
+    private void smsLock(){
+        // Do not send a new SMS until the response for the previous SMS has been received
+        //   * for the error case where the response never comes back, time out after
+        //     30 seconds and just try the next SEND_SMS
+        synchronized (mSMSLock) {
+            long timeoutTime  = SystemClock.elapsedRealtime() + SEND_SMS_TIMEOUT_IN_MS;
+            long waitTimeLeft = SEND_SMS_TIMEOUT_IN_MS;
+            while (mIsSendingSMS && (waitTimeLeft > 0)) {
+                Rlog.d(RILJ_LOG_TAG, "sendSMS() waiting for response of previous SEND_SMS");
+                try {
+                    mSMSLock.wait(waitTimeLeft);
+                } catch (InterruptedException ex) {
+                    // ignore the interrupt and rewait for the remainder
+                }
+                waitTimeLeft = timeoutTime - SystemClock.elapsedRealtime();
+            }
+            if (waitTimeLeft <= 0) {
+                Rlog.e(RILJ_LOG_TAG, "sendSms() timed out waiting for response of previous CDMA_SEND_SMS");
+            }
+            mIsSendingSMS = true;
+        }
+
+    }
+
+    @Override
     protected Object responseSignalStrength(Parcel p) {
         int numInts = 12;
         int response[];
@@ -157,7 +217,6 @@ public class d2lteRIL extends RIL implements CommandsInterface {
     protected Object
     responseCallList(Parcel p) {
         int num;
-        int voiceSettings;
         ArrayList<DriverCall> response;
         DriverCall dc;
 
@@ -173,29 +232,26 @@ public class d2lteRIL extends RIL implements CommandsInterface {
             dc = new DriverCall();
 
             dc.state = DriverCall.stateFromCLCC(p.readInt());
-            dc.index = p.readInt() & 0xff;
+            dc.index = p.readInt();
             dc.TOA = p.readInt();
             dc.isMpty = (0 != p.readInt());
             dc.isMT = (0 != p.readInt());
             dc.als = p.readInt();
-            voiceSettings = p.readInt();
-            if (isGSM){
-                p.readInt();
-            }
-            dc.isVoice = (0 == voiceSettings) ? false : true;
-            dc.isVoicePrivacy = (0 != p.readInt());
-            if (isGSM) {
+            dc.isVoice = (0 != p.readInt());
+            if (!isGSM) {
                 p.readInt();
                 p.readInt();
                 p.readString();
             }
+            dc.isVoicePrivacy = (0 != p.readInt());
             dc.number = p.readString();
-            int np = p.readInt();
-            dc.numberPresentation = DriverCall.presentationFromCLIP(np);
+            dc.numberPresentation = DriverCall.presentationFromCLIP(p.readInt());
             dc.name = p.readString();
-            dc.namePresentation = p.readInt();
-            int uusInfoPresent = p.readInt();
-            if (uusInfoPresent == 1) {
+            if (isGSM)
+                dc.namePresentation = DriverCall.presentationFromCLIP(p.readInt());
+            else
+                dc.namePresentation = p.readInt();
+            if (p.readInt() == 1) { // uusInfoPresent
                 dc.uusInfo = new UUSInfo();
                 dc.uusInfo.setType(p.readInt());
                 dc.uusInfo.setDcs(p.readInt());
@@ -279,6 +335,10 @@ public class d2lteRIL extends RIL implements CommandsInterface {
                 ret = responseInts(p);
                 setWbAmr(((int[])ret)[0]);
                 break;
+            case 11055: // RIL_UNSOL_ON_SS:
+                p.setDataPosition(dataPosition);
+                p.writeInt(RIL_UNSOL_ON_SS);
+                // Do not break
             default:
                 // Rewind the Parcel
                 p.setDataPosition(dataPosition);
@@ -288,6 +348,19 @@ public class d2lteRIL extends RIL implements CommandsInterface {
                 return;
         }
 
+    }
+
+    @Override
+    public void
+    acceptCall (Message result) {
+        RILRequest rr = RILRequest.obtain(RIL_REQUEST_ANSWER, result);
+
+        rr.mParcel.writeInt(1);
+        rr.mParcel.writeInt(0);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
     }
 
     @Override
@@ -446,8 +519,8 @@ public class d2lteRIL extends RIL implements CommandsInterface {
     protected void notifyRegistrantsCdmaInfoRec(CdmaInformationRecords infoRec) {
         final int response = RIL_UNSOL_CDMA_INFO_REC;
 
-        if (infoRec.record instanceof CdmaInformationRecords.CdmaSignalInfoRec) {
-            CdmaInformationRecords.CdmaSignalInfoRec sir = (CdmaInformationRecords.CdmaSignalInfoRec) infoRec.record;
+        if (infoRec.record instanceof CdmaSignalInfoRec) {
+            CdmaSignalInfoRec sir = (CdmaSignalInfoRec) infoRec.record;
             if (sir != null
                     && sir.isPresent
                     && sir.signalType == SignalToneUtil.IS95_CONST_IR_SIGNAL_IS54B
@@ -462,6 +535,20 @@ public class d2lteRIL extends RIL implements CommandsInterface {
         }
 
         super.notifyRegistrantsCdmaInfoRec(infoRec);
+    }
+
+
+
+    @Override
+    protected Object
+    responseSMS(Parcel p) {
+        // Notify that sendSMS() can send the next SMS
+        synchronized (mSMSLock) {
+            mIsSendingSMS = false;
+            mSMSLock.notify();
+        }
+
+        return super.responseSMS(p);
     }
 
     @Override
@@ -489,38 +576,6 @@ public class d2lteRIL extends RIL implements CommandsInterface {
         send(rr);
     }
 
-    //this method is used in the search network functionality.
-    // in mobile network setting-> network operators
-    @Override
-    protected Object
-    responseOperatorInfos(Parcel p) {
-        String strings[] = (String [])responseStrings(p);
-        ArrayList<OperatorInfo> ret;
-
-        if (strings.length % mQANElements != 0) {
-            throw new RuntimeException(
-                                       "RIL_REQUEST_QUERY_AVAILABLE_NETWORKS: invalid response. Got "
-                                       + strings.length + " strings, expected multiple of " + mQANElements);
-        }
-
-        ret = new ArrayList<OperatorInfo>(strings.length / mQANElements);
-        Operators init = null;
-        if (strings.length != 0) {
-            init = new Operators();
-        }
-        for (int i = 0 ; i < strings.length ; i += mQANElements) {
-            String temp = init.unOptimizedOperatorReplace(strings[i+0]);
-            ret.add (
-                     new OperatorInfo(
-                                      temp, //operatorAlphaLong
-                                      temp,//operatorAlphaShort
-                                      strings[i+2],//operatorNumeric
-                                      strings[i+3]));//state
-        }
-
-        return ret;
-    }
-
     @Override
     public void getImsRegistrationState(Message result) {
         if(mRilVersion >= 8)
@@ -532,6 +587,30 @@ public class d2lteRIL extends RIL implements CommandsInterface {
                 AsyncResult.forMessage(result, null, ex);
                 result.sendToTarget();
             }
+        }
+    }
+
+    // Hack for Lollipop
+    // The system now queries for SIM status before radio on, resulting
+    // in getting an APPSTATE_DETECTED state. The RIL does not send an
+    // RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED message after the SIM is
+    // initialized, so delay the message until the radio is on.
+    @Override
+    public void getIccCardStatus(Message result) {
+        if (mState != RadioState.RADIO_ON) {
+            mPendingGetSimStatus = result;
+        } else {
+            super.getIccCardStatus(result);
+        }
+    }
+
+    @Override
+    protected void switchToRadioState(RadioState newState) {
+        super.switchToRadioState(newState);
+
+        if (newState == RadioState.RADIO_ON && mPendingGetSimStatus != null) {
+            super.getIccCardStatus(mPendingGetSimStatus);
+            mPendingGetSimStatus = null;
         }
     }
 
@@ -556,5 +635,23 @@ public class d2lteRIL extends RIL implements CommandsInterface {
             AsyncResult.forMessage(response, ret, null);
             response.sendToTarget();
         }
+    }
+
+    protected Object
+    responseFailCause(Parcel p) {
+        int numInts;
+        int response[];
+
+        numInts = p.readInt();
+        response = new int[numInts];
+        for (int i = 0 ; i < numInts ; i++) {
+            response[i] = p.readInt();
+        }
+        LastCallFailCause failCause = new LastCallFailCause();
+        failCause.causeCode = response[0];
+        if (p.dataAvail() > 0) {
+          failCause.vendorCause = p.readString();
+        }
+        return failCause;
     }
 }

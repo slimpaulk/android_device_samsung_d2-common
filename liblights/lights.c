@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project.
- * Copyright (C) 2014 The CyanogenMod Project.
+ * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2012 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,6 @@ char const*const PANEL_FILE = "/sys/class/leds/lcd-backlight/brightness";
 char const*const BUTTON_FILE = "/sys/class/leds/button-backlight/brightness";
 
 char const*const LED_BLINK = "/sys/class/sec/led/led_blink";
-char const*const KEYBOARD_FILE = "/sys/class/leds/keyboard-backlight/brightness";
-
-#ifdef USE_BLN
-char const*const BLN_FILE = "/sys/devices/virtual/sec/sec_touchkey/touchkey_bln_enable";
-#endif
 
 struct led_config {
     unsigned int color;
@@ -68,8 +63,8 @@ static int write_int(char const *path, int value)
 
     if (fd >= 0) {
         char buffer[20];
-        int bytes = snprintf(buffer, sizeof(buffer), "%d\n", value);
-        ssize_t amt = write(fd, buffer, (size_t)bytes);
+        int bytes = sprintf(buffer, "%d\n", value);
+        int amt = write(fd, buffer, bytes);
         close(fd);
         return amt == -1 ? -errno : 0;
     } else {
@@ -173,37 +168,6 @@ set_light_buttons(UNUSED struct light_device_t* dev,
 
 }
 
-static int
-set_light_keyboard(UNUSED struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    int err = 0;
-    int on = is_lit(state);
-
-    pthread_mutex_lock(&g_lock);
-    err = write_int(KEYBOARD_FILE, on?255:0);
-    pthread_mutex_unlock(&g_lock);
-
-    return err;
-
-}
-
-#ifdef USE_BLN
-static int
-set_light_bln(struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    int err = 0;
-    int on = is_lit(state);
-
-    pthread_mutex_lock(&g_lock);
-    err = write_int(BLN_FILE, on?1:0);
-    pthread_mutex_unlock(&g_lock);
-
-    return err;
-}
-#endif
-
 static int close_lights(struct light_device_t *dev)
 {
     ALOGV("close_light is called");
@@ -224,7 +188,7 @@ static int write_leds(const struct led_config *led)
     if (led == NULL)
         led = &led_off;
 
-    if ((count = snprintf(blink, sizeof(blink)-1, "%#08x %d %d", led->color,
+    if ((count = snprintf(blink, sizeof(blink)-1, "0x%08x %d %d", led->color,
                           led->delay_on, led->delay_off)) < 0) {
         return -errno;
     } else if ((unsigned int)count >= sizeof(blink)-1) {
@@ -232,7 +196,7 @@ static int write_leds(const struct led_config *led)
         return -EINVAL;
     }
 
-    ALOGD("%s: color=%#08x, delay_on=%d, delay_off=%d, blink=\"%s\".",
+    ALOGD("%s: color=0x%08x, delay_on=%d, delay_off=%d, blink=\"%s\".",
           __func__, led->color, led->delay_on, led->delay_off, blink);
 
     /* Add '\n' here to make the above log message clean. */
@@ -251,7 +215,7 @@ static int set_light_leds(struct light_state_t const *state, int type)
     struct led_config *led;
     int err = 0;
 
-    ALOGD("%s: type=%d, color=%#010x, fM=%d, fOnMS=%d, fOffMs=%d.", __func__,
+    ALOGD("%s: type=%d, color=0x%010x, fM=%d, fOnMS=%d, fOffMs=%d.", __func__,
           type, state->color,state->flashMode, state->flashOnMS, state->flashOffMS);
 
     if (type < 0 || (unsigned int)type >= sizeof(g_leds)/sizeof(g_leds[0]))
@@ -358,16 +322,10 @@ static int open_lights(const struct hw_module_t *module, char const *name,
         set_light = set_light_backlight;
     else if (0 == strcmp(LIGHT_ID_BUTTONS, name))
         set_light = set_light_buttons;
-    else if (0 == strcmp(LIGHT_ID_KEYBOARD, name))
-        set_light = set_light_keyboard;
     else if (0 == strcmp(LIGHT_ID_BATTERY, name))
         set_light = set_light_leds_battery;
     else if (0 == strcmp(LIGHT_ID_NOTIFICATIONS, name))
-#ifdef USE_BLN
-        set_light = set_light_bln;
-#else
         set_light = set_light_leds_notifications;
-#endif
     else if (0 == strcmp(LIGHT_ID_ATTENTION, name))
         set_light = set_light_leds_attention;
     else
@@ -376,10 +334,6 @@ static int open_lights(const struct hw_module_t *module, char const *name,
     pthread_once(&g_init, init_g_lock);
 
     struct light_device_t *dev = malloc(sizeof(struct light_device_t));
-
-    if(!dev)
-        return -ENOMEM;
-
     memset(dev, 0, sizeof(*dev));
 
     dev->common.tag = HARDWARE_DEVICE_TAG;
@@ -402,7 +356,7 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
     .version_major = 1,
     .version_minor = 0,
     .id = LIGHTS_HARDWARE_MODULE_ID,
-    .name = "D2 Lights Module",
+    .name = "JF Lights Module",
     .author = "The CyanogenMod Project",
     .methods = &lights_module_methods,
 };
